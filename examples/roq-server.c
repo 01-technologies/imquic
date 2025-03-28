@@ -9,6 +9,8 @@
  */
 
 #include <arpa/inet.h>
+#include <sys/socket.h>
+#include <netdb.h>
 
 #include <imquic/imquic.h>
 #include <imquic/roq.h>
@@ -39,6 +41,10 @@ static void imquic_demo_handle_signal(int signum) {
 
 /* Handled connections */
 static GHashTable *connections = NULL;
+
+/* RTP forwarding socket */
+static int forward_socket = -1;
+static struct sockaddr_in forward_addr;
 
 /* RTP header */
 typedef struct imquic_rtp_header {
@@ -97,6 +103,22 @@ static void imquic_demo_rtp_incoming(imquic_connection *conn, uint64_t flow_id, 
 	IMQUIC_LOG(IMQUIC_LOG_INFO, "[%s]  -- [flow=%"SCNu64"][%zu] ssrc=%"SCNu32", pt=%d, seq=%"SCNu16", ts=%"SCNu32"\n",
 		imquic_get_connection_name(conn), flow_id, blen,
 		ntohl(rtp->ssrc), rtp->type, ntohs(rtp->seq_number), ntohl(rtp->timestamp));
+	
+	/* Forward RTP packet if forwarding is enabled */
+	if(options.forward_rtp && forward_socket > 0) {
+		int bytes_sent = sendto(forward_socket, bytes, blen, 0, 
+			(struct sockaddr *)&forward_addr, sizeof(forward_addr));
+		if(bytes_sent < 0) {
+			IMQUIC_LOG(IMQUIC_LOG_WARN, "[%s]  -- Error forwarding RTP packet: %s\n",
+				imquic_get_connection_name(conn), strerror(errno));
+		} else if((size_t)bytes_sent != blen) {
+			IMQUIC_LOG(IMQUIC_LOG_WARN, "[%s]  -- Partial RTP packet forwarding: %d/%zu bytes\n",
+				imquic_get_connection_name(conn), bytes_sent, blen);
+		} else {
+			IMQUIC_LOG(IMQUIC_LOG_DBG, "[%s]  -- Forwarded RTP packet: %zu bytes\n",
+				imquic_get_connection_name(conn), blen);
+		}
+	}
 }
 
 static void imquic_demo_connection_gone(imquic_connection *conn) {
@@ -117,6 +139,11 @@ int main(int argc, char *argv[]) {
 
 	/* Initialize some command line options defaults */
 	options.debug_level = IMQUIC_LOG_INFO;
+	/* Set defaults for RTP forwarding */
+	options.forward_rtp = FALSE;
+	options.forward_host = "127.0.0.1";
+	options.forward_port = 10000;
+
 	/* Let's call our cmdline parser */
 	if(!demo_options_parse(&options, argc, argv)) {
 		demo_options_show_usage();
@@ -178,6 +205,42 @@ int main(int argc, char *argv[]) {
 		ret = 1;
 		goto done;
 	}
+
+	/* Initialize RTP forwarding if enabled */
+	if(options.forward_rtp) {
+		IMQUIC_LOG(IMQUIC_LOG_INFO, "RTP forwarding enabled to %s:%d\n", 
+			options.forward_host, options.forward_port);
+
+		/* Create UDP socket for forwarding */
+		forward_socket = socket(AF_INET, SOCK_DGRAM, 0);
+		if(forward_socket < 0) {
+			IMQUIC_LOG(IMQUIC_LOG_FATAL, "Error creating UDP socket: %s\n", strerror(errno));
+			ret = 1;
+			goto done;
+		}
+
+		/* Set up destination address */
+		memset(&forward_addr, 0, sizeof(forward_addr));
+		forward_addr.sin_family = AF_INET;
+		forward_addr.sin_port = htons(options.forward_port);
+
+		/* Resolve the hostname */
+		struct hostent *host = gethostbyname(options.forward_host);
+		if(!host) {
+			IMQUIC_LOG(IMQUIC_LOG_FATAL, "Failed to resolve hostname %s: %s\n", 
+				options.forward_host, strerror(errno));
+			close(forward_socket);
+			forward_socket = -1;
+			ret = 1;
+			goto done;
+		}
+
+		/* Set the resolved address */
+		forward_addr.sin_addr = *(struct in_addr *)host->h_addr;
+		IMQUIC_LOG(IMQUIC_LOG_INFO, "RTP will be forwarded to %s:%d\n", 
+			inet_ntoa(forward_addr.sin_addr), options.forward_port);
+	}
+
 	imquic_server *server = imquic_create_roq_server("roq-server",
 		IMQUIC_CONFIG_INIT,
 		IMQUIC_CONFIG_TLS_CERT, options.cert_pem,
@@ -212,6 +275,12 @@ int main(int argc, char *argv[]) {
 		g_usleep(100000);
 
 	imquic_shutdown_endpoint(server);
+
+	/* Close RTP forwarding socket if open */
+	if(forward_socket > 0) {
+		close(forward_socket);
+		forward_socket = -1;
+	}
 
 done:
 	imquic_deinit();

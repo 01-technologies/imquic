@@ -30,6 +30,10 @@ gboolean demo_options_parse(demo_options *options, int argc, char *argv[]) {
 		{ "debug-level", 'd', 0, G_OPTION_ARG_INT, &options->debug_level, "Debug/logging level (0=disable debugging, 7=maximum debug level; default=4)", "1-7" },
 		{ "debug-locks", 'L', 0, G_OPTION_ARG_NONE, &options->debug_locks, "Whether to verbosely debug mutex/lock accesses (default=no)", NULL },
 		{ "debug-refcounts", 'C', 0, G_OPTION_ARG_NONE, &options->debug_refcounts, "Whether to verbosely debug reference counting (default=no)", NULL },
+		/* RTP forwarding options */
+		{ "forward-rtp", 'f', 0, G_OPTION_ARG_NONE, &options->forward_rtp, "Whether to forward received RTP packets to another application (default=no)", NULL },
+		{ "forward-host", 'H', 0, G_OPTION_ARG_STRING, &options->forward_host, "Host to forward RTP packets to (default=127.0.0.1)", "hostname" },
+		{ "forward-port", 'F', 0, G_OPTION_ARG_INT, &options->forward_port, "Port to forward RTP packets to (default=10000)", "port" },
 		{ NULL, 0, 0, 0, NULL, NULL, NULL },
 	};
 

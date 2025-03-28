@@ -30,6 +30,10 @@ typedef struct demo_options {
 	int debug_level;
 	gboolean debug_locks;
 	gboolean debug_refcounts;
+	/* RTP forwarding options */
+	gboolean forward_rtp;
+	const char *forward_host;
+	int forward_port;
 } demo_options;
 
 /* Helper method to parse the command line options */
