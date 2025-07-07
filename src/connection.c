@@ -104,6 +104,7 @@ static void imquic_connection_free(const imquic_refcount *conn_ref) {
 	g_queue_free_full(conn->incoming_data, (GDestroyNotify)g_free);
 	g_queue_free_full(conn->outgoing_data, (GDestroyNotify)g_free);
 	g_queue_free_full(conn->outgoing_datagram, (GDestroyNotify)g_free);
+	imquic_listmap_destroy(conn->blocked_streams);
 	if(conn->ld_timer != NULL)
 		g_source_destroy((GSource *)conn->ld_timer);
 	if(conn->idle_timer != NULL)
@@ -172,6 +173,7 @@ imquic_connection *imquic_connection_create(imquic_network_endpoint *socket) {
 	conn->incoming_data = g_queue_new();
 	conn->outgoing_data = g_queue_new();
 	conn->outgoing_datagram = g_queue_new();
+	conn->blocked_streams = imquic_listmap_create(IMQUIC_LISTMAP_NUMBER64, (GDestroyNotify)g_free);
 	/* We'll set the ALPN(s) manually: 1 byte prefix + the string itself for each of them */
 	size_t length = 0, offset = 0, alpn_len = 0;
 	if(conn->socket->raw_quic) {
@@ -648,7 +650,7 @@ void imquic_connection_flush_stream(imquic_connection *conn, uint64_t stream_id)
 /* Helpers to close connections */
 void imquic_connection_close(imquic_connection *conn, uint64_t error_code, uint64_t frame_type, const char *reason) {
 	/* FIXME Send a CONNECTION CLOSE (01c) */
-	if(conn == NULL || conn->socket == NULL)
+	if(conn == NULL || conn->socket == NULL || !g_atomic_int_compare_and_exchange(&conn->closed, 0, 1))
 		return;
 #if HAVE_QLOG
 	if(conn->qlog != NULL && conn->qlog->quic) {

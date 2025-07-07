@@ -152,6 +152,11 @@ struct imquic_connection {
 	 * along with a generic refactoring of the event loop (e.g., for
 	 * congestion control, and/or the need to perform pacing/probing) */
 	GQueue *outgoing_data, *outgoing_datagram;
+	/*! \brief Listmap of blocked streams, in case we're waiting for credits
+	 * \todo The queueing of data needs to be improved considerably,
+	 * along with a generic refactoring of the event loop (e.g., for
+	 * congestion control, and/or the need to perform pacing/probing) */
+	imquic_listmap *blocked_streams;
 	/*! \brief Trigger to wake the loop for this connection as part
 	 * of the imquic_connection_source management */
 	volatile gint wakeup;
@@ -220,6 +225,10 @@ struct imquic_connection {
 #endif
 	/*! \brief Mutex */
 	imquic_mutex mutex;
+	/*! \brief Whether this connection should be closed */
+	gboolean should_close;
+	/*! \brief Whether this connection has been closed */
+	volatile gint closed;
 	/*! \brief Whether this instance has been destroyed (reference counting) */
 	volatile gint destroyed;
 	/*! \brief Reference counter */

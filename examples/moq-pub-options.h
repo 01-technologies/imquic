@@ -11,6 +11,8 @@
 #ifndef MOQ_PUB_OPTIONS
 #define MOQ_PUB_OPTIONS
 
+#include <stdint.h>
+
 #include <glib.h>
 
 /*! \brief Struct containing the parsed command line options */
@@ -18,8 +20,11 @@ typedef struct demo_options {
 	char *moq_version;
 	const char **track_namespace;
 	const char *track_name;
+	uint64_t first_group;
+	const char *relay_auth_info;
 	const char *auth_info;
 	const char *delivery;
+	gboolean publish;
 	gboolean extensions;
 	const char *ip;
 	int port;

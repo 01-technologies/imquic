@@ -42,13 +42,11 @@ static void imquic_demo_new_connection(imquic_connection *conn, void *user_data)
 	imquic_connection_ref(conn);
 	echo_conn = conn;
 	IMQUIC_LOG(IMQUIC_LOG_INFO, "[%s] New connection\n", imquic_get_connection_name(conn));
-	/* Send "ciao" */
-	uint8_t bytes[] = {
-		0x63, 0x69, 0x61, 0x6F
-	};
+	/* Send our text */
+	const char *text = options.text ? options.text : "ciao";
 	uint64_t stream_id = 0;
 	imquic_new_stream_id(conn, TRUE, &stream_id);
-	imquic_send_on_stream(conn, stream_id, bytes, 0, sizeof(bytes), TRUE);
+	imquic_send_on_stream(conn, stream_id, (uint8_t *)text, 0, strlen(text), TRUE);
 }
 
 static void imquic_demo_stream_incoming(imquic_connection *conn, uint64_t stream_id,
@@ -91,7 +89,7 @@ int main(int argc, char *argv[]) {
 
 	IMQUIC_PRINT("imquic version %s\n", imquic_get_version_string_full());
 	IMQUIC_PRINT("  -- %s (commit hash)\n", imquic_get_build_sha());
-	IMQUIC_PRINT("  -- %s (build time)\n", imquic_get_build_time());
+	IMQUIC_PRINT("  -- %s (build time)\n\n", imquic_get_build_time());
 
 	/* Initialize some command line options defaults */
 	options.debug_level = IMQUIC_LOG_INFO;
@@ -154,6 +152,7 @@ int main(int argc, char *argv[]) {
 			i++;
 		}
 	}
+	IMQUIC_LOG(IMQUIC_LOG_INFO, "\n");
 
 	/* Initialize the library and create a server */
 	if(imquic_init(options.secrets_log) < 0) {

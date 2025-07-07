@@ -80,7 +80,7 @@ uint64_t imquic_read_varint(uint8_t *bytes, size_t blen, uint8_t *length) {
 }
 
 uint8_t imquic_write_varint(uint64_t number, uint8_t *bytes, size_t blen) {
-	if(blen < 1)
+	if(blen < 1 || number > IMQUIC_MAX_VARINT)
 		return 0;
 	if(number <= 63) {
 		/* Let's use one byte */
@@ -148,7 +148,7 @@ uint64_t imquic_read_pfxint(uint8_t n, uint8_t *bytes, size_t blen, uint8_t *len
 			return 0;
 		}
 		b = bytes[i];
-		number += (b & 0x7f) * (1 << m);
+		number += (b & 0x7f) * ((uint64_t)1 << m);
 		m += 7;
 	};
 	if(length)
